@@ -72,7 +72,8 @@ stop
 - **Python**
 - **SpeechRecognition** – converts speech to text
 - **pyttsx3** – text-to-speech
-- **datetime** – date and time handling
+- **datetime** – date and time handlingtime based greetings)
+- **tellsjokes**
 - **webbrowser** – open Google search results
 
 ---
