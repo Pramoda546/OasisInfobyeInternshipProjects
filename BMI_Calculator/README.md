@@ -1,3 +1,3 @@
 #BMI Calculator
 
-Run 'python bmiCalculator.py
+Run 'python bmiCalculator.py'.
