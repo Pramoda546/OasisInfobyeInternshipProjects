@@ -6,59 +6,6 @@ from tkinter import scrolledtext, simpledialog, messagebox
 HOST = '127.0.0.1'
 PORT = 12345
 
-class ChatServer:
-    def __init__(self, host=HOST, port=PORT):
-        self.host = host
-        self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        self.clients = []
-        self.nicknames = []
-        print(f"Server started on {self.host}:{self.port}")
-
-    def broadcast(self, message, _client):
-        for client in self.clients:
-            if client != _client:
-                try:
-                    client.send(message)
-                except:
-                    client.close()
-                    if client in self.clients:
-                        self.clients.remove(client)
-
-    def handle_client(self, client):
-        while True:
-            try:
-                message = client.recv(1024)
-                if not message:
-                    raise ConnectionResetError
-                self.broadcast(message, client)
-            except:
-                index = self.clients.index(client)
-                client.close()
-                self.clients.remove(client)
-                nickname = self.nicknames[index]
-                self.nicknames.remove(nickname)
-                self.broadcast(f'{nickname} left the chat.'.encode('utf-8'), client)
-                break
-
-    def receive(self):
-        while True:
-            client, address = self.server_socket.accept()
-            print(f"Connected with {str(address)}")
-            client.send('NICK'.encode('utf-8'))
-            nickname = client.recv(1024).decode('utf-8')
-            self.nicknames.append(nickname)
-            self.clients.append(client)
-
-            print(f"Nickname of the client is {nickname}")
-            self.broadcast(f'{nickname} joined the chat!'.encode('utf-8'), client)
-            client.send('Connected to the server!'.encode('utf-8'))
-
-            thread = threading.Thread(target=self.handle_client, args=(client,))
-            thread.start()
-
 class ChatClient:
     def __init__(self, master):
         self.master = master
@@ -75,9 +22,18 @@ class ChatClient:
         self.send_btn.pack(padx=(0,10), pady=(0,10), side=tk.RIGHT)
 
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((HOST, PORT))
+        try:
+            self.client_socket.connect((HOST, PORT))
+        except Exception as e:
+            messagebox.showerror("Connection Error", f"Cannot connect to server: {e}")
+            self.master.destroy()
+            return
 
         self.nickname = simpledialog.askstring("Nickname", "Choose your nickname", parent=self.master)
+        if not self.nickname:
+            messagebox.showwarning("Nickname Required", "Nickname is required to join.")
+            self.master.destroy()
+            return
 
         threading.Thread(target=self.receive_messages, daemon=True).start()
 
@@ -98,16 +54,20 @@ class ChatClient:
                 break
 
     def send_message(self):
-        message = f'{self.nickname}: {self.entry_msg.get()}'
-        self.client_socket.send(message.encode('utf-8'))
-        self.entry_msg.delete(0, tk.END)
+        message = self.entry_msg.get()
+        if message.strip() == "":
+            return
+        full_message = f'{self.nickname}: {message}'
+        try:
+            self.client_socket.send(full_message.encode('utf-8'))
+            self.entry_msg.delete(0, tk.END)
+        except:
+            messagebox.showerror("Error", "Failed to send message")
+            self.client_socket.close()
+            self.master.destroy()
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == 'server':
-        server = ChatServer()
-        server.receive()
-    else:
-        root = tk.Tk()
-        client_app = ChatClient(root)
-        root.mainloop()
+    root = tk.Tk()
+    client_app = ChatClient(root)
+    root.mainloop()
+
